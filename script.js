@@ -1,7 +1,8 @@
 (() => {
-  // ---- edit this line to change the shortcut -------------------------------------------
+  // ---- edit these two lines ------------------------------------------------------------
   // Modifiers: ctrl, shift, alt, meta (cmd). Last part is the key: m, f10, space, contextmenu...
   const MENU_COMBO = "Ctrl+Shift+M";
+  const SEEK_SECONDS = 0.5;
   // --------------------------------------------------------------------------------------
 
   const ALIASES = { space: " ", esc: "escape", cmd: "meta", del: "delete", return: "enter" };
@@ -80,7 +81,7 @@
     );
   };
 
-  // 3. Shortcut: open the context menu at the mouse position
+  // 3. Keys
   let mx = Math.round(window.innerWidth / 2);
   let my = Math.round(window.innerHeight / 2);
   const onMouseMove = (e) => {
@@ -88,8 +89,33 @@
     my = e.clientY;
   };
 
+  const seekBy = (delta) => {
+    const video = document.querySelector("[data-harbor-player] video");
+    if (video && Number.isFinite(video.duration)) {
+      video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + delta));
+      return;
+    }
+    const ti = window.__TAURI_INTERNALS__;
+    if (ti && ti.invoke) {
+      Promise.resolve(ti.invoke("mpv_command", { cmd: ["seek", delta, "relative", "exact"] })).catch(() => {});
+    }
+  };
+
   const onKeyDown = (e) => {
-    if (!e.isTrusted || e.repeat || isTyping(e) || !comboMatches(e)) return;
+    if (!e.isTrusted || isTyping(e)) return;
+
+    if (
+      e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey &&
+      (e.key === "ArrowLeft" || e.key === "ArrowRight")
+    ) {
+      if (!document.querySelector("[data-harbor-player]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      seekBy(e.key === "ArrowRight" ? SEEK_SECONDS : -SEEK_SECONDS);
+      return;
+    }
+
+    if (e.repeat || !comboMatches(e)) return;
     const stage = findStage();
     if (!stage) return;
     e.preventDefault();
